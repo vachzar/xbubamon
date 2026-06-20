@@ -39,7 +39,7 @@ BATTERY_KEY = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2"
 APP_NAME = "BT Battery"
 COPYRIGHT = "Copyright (C) 2026 by JARxAI"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ICON_PATH = os.path.join(BASE_DIR, "icon.png")
+ICON_PATH = os.path.join(BASE_DIR, "icon.ico")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 
 # ============================================================
@@ -112,6 +112,10 @@ class NotificationManager:
         def show():
             root = tk.Tk()
             root.title(title)
+            if os.path.exists(ICON_PATH):
+                try:
+                    root.iconbitmap(ICON_PATH)
+                except: pass
             # Position near taskbar (bottom-right)
             x = root.winfo_screenwidth() - 370
             y = root.winfo_screenheight() - 180
@@ -273,6 +277,10 @@ def show_settings(icon_ref, settings, on_done):
     def show():
         root = tk.Tk()
         root.title("Settings - " + APP_NAME)
+        if os.path.exists(ICON_PATH):
+            try:
+                root.iconbitmap(ICON_PATH)
+            except: pass
         root.geometry("450x400")
         root.attributes("-topmost", True)
         
@@ -343,6 +351,10 @@ def show_info(devices):
     def show():
         root = tk.Tk()
         root.title(APP_NAME + " - Info")
+        if os.path.exists(ICON_PATH):
+            try:
+                root.iconbitmap(ICON_PATH)
+            except: pass
         root.geometry("450x350")
         root.attributes("-topmost", True)
         t = tk.Text(root, wrap=tk.WORD, padx=10, pady=10, font=("Consolas",10))
@@ -371,6 +383,10 @@ def show_about():
     def show():
         root = tk.Tk()
         root.title("About")
+        if os.path.exists(ICON_PATH):
+            try:
+                root.iconbitmap(ICON_PATH)
+            except: pass
         root.geometry("300x180")
         root.resizable(False, False)
         root.attributes("-topmost", True)
