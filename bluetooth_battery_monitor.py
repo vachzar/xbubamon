@@ -39,6 +39,7 @@ BATTERY_KEY = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2"
 APP_NAME = "BT Battery"
 COPYRIGHT = "Copyright (C) 2026 by JARxAI"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ICON_PATH = os.path.join(BASE_DIR, "icon.png")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 
 # ============================================================
@@ -99,8 +100,6 @@ class NotificationManager:
                     self.notify(device_name, battery_level)
                     self.notified[key] = True
                     break
-                else:
-    
     def notify(self, device_name, battery_level):
         title = "Battery Low"
         msg = f"{device_name} is at {battery_level}%"
@@ -243,6 +242,7 @@ def _parse_scan(out):
 # Icon Drawing
 # ============================================================
 def make_icon(battery=None):
+    """Create dynamic battery icon"""
     img = Image.new("RGBA", (64, 64), (0,0,0,0))
     d = ImageDraw.Draw(img)
     if battery is None:
@@ -480,11 +480,11 @@ class App:
         if self.display_device:
             b = self.display_device.get("Battery")
             title = self.display_device["Name"] + " | " + str(b if b else "?") + "%"
-            icon_img = make_icon(b)
         else:
             title = "No device"
-            icon_img = make_icon(None)
+            b = None
         
+        icon_img = make_icon(b)
         self.icon = pystray.Icon(APP_NAME, icon_img, title=title, menu=menu)
         
         # Background poller
