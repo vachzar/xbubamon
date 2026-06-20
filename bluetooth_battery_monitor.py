@@ -30,6 +30,15 @@ import pystray
 from pystray import MenuItem as item
 from PIL import Image, ImageDraw, ImageFont
 
+# Embed icon for PyInstaller
+def resource_path(relative_path):
+    """Get absolute path to resource"""
+    try:
+        base_path = sys._MEIPASS
+    except:
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
+
 # ============================================================
 # Constants
 # ============================================================
@@ -39,7 +48,8 @@ BATTERY_KEY = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2"
 APP_NAME = "BT Battery"
 COPYRIGHT = "Copyright (C) 2026 by JARxAI"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ICON_PATH = os.path.join(BASE_DIR, "icon.ico")
+ICON_PATH = resource_path("icon.ico")
+ICON_PNG_PATH = resource_path("icon.png")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 
 # ============================================================
@@ -394,7 +404,7 @@ def show_about():
         f.pack(fill=tk.BOTH, expand=True)
         
         # Icon logo
-        png_path = os.path.join(BASE_DIR, "icon.png")
+        png_path = ICON_PNG_PATH
         if os.path.exists(png_path):
             try:
                 from PIL import Image, ImageTk
