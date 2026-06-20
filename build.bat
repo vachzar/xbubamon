@@ -16,7 +16,7 @@ if errorlevel 1 (
 
 REM Install dependencies
 echo [1/3] Installing dependencies...
-pip install pystray pillow pyinstaller --quiet
+pip install pystray pillow --quiet
 if errorlevel 1 (
     echo [ERROR] Failed to install dependencies!
     pause
@@ -26,7 +26,7 @@ echo       Done!
 
 REM Build EXE
 echo [2/3] Building EXE...
-pyinstaller --onefile --windowed --name "BT Battery" bluetooth_battery_monitor.py
+pyinstaller --onefile --windowed --icon=icon.ico --name "BT Battery" bluetooth_battery_monitor.py
 if errorlevel 1 (
     echo [ERROR] Build failed!
     pause
@@ -34,15 +34,11 @@ if errorlevel 1 (
 )
 echo       Done!
 
-REM Copy to current directory
-echo [3/3] Copying to current directory...
-copy "dist\BT Battery.exe" "." >nul 2>&1
-echo       Done!
-
+REM Show result
+echo [3/3] Build complete!
 echo.
 echo ========================================
-echo   Build complete!
-echo   EXE location: BT Battery.exe
+echo   EXE location: dist\BT Battery.exe
 echo ========================================
 echo.
 pause
