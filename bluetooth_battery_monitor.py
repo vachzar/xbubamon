@@ -383,15 +383,28 @@ def show_about():
     def show():
         root = tk.Tk()
         root.title("About")
+        root.geometry("300x250")
+        root.resizable(False, False)
+        root.attributes("-topmost", True)
         if os.path.exists(ICON_PATH):
             try:
                 root.iconbitmap(ICON_PATH)
             except: pass
-        root.geometry("300x180")
-        root.resizable(False, False)
-        root.attributes("-topmost", True)
         f = tk.Frame(root, padx=20, pady=15)
         f.pack(fill=tk.BOTH, expand=True)
+        
+        # Icon logo
+        png_path = os.path.join(BASE_DIR, "icon.png")
+        if os.path.exists(png_path):
+            try:
+                from PIL import Image, ImageTk
+                img = Image.open(png_path).resize((64, 64), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+                tk.Label(f, image=photo).pack(pady=(0,10))
+                f._img = photo  # Keep reference
+            except Exception as e:
+                print(f"Icon error: {e}")
+        
         tk.Label(f, text=APP_NAME, font=("Arial",14,"bold")).pack()
         tk.Label(f, text="Bluetooth Battery Monitor").pack(pady=(5,0))
         tk.Label(f, text=COPYRIGHT, font=("Arial",9,"italic"), fg="gray").pack(pady=(10,0))
