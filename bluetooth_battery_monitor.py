@@ -1,11 +1,17 @@
 """
 Bluetooth Battery Monitor - JARxAI
 Copyright (C) 2026 by JARxAI
+
+Features:
+- Real-time battery monitoring
+- Multi-device display (configurable)
+- Battery notifications (30%, 20%, 10%)
 """
 
 import sys, time, threading, subprocess, json, os
 from datetime import datetime
 import tkinter as tk
+from tkinter import ttk
 
 # Auto-install
 for pkg, pip_name in [("pystray", "pystray"), ("PIL", "Pillow")]:
@@ -13,16 +19,108 @@ for pkg, pip_name in [("pystray", "pystray"), ("PIL", "Pillow")]:
     except: subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
+# Try to install winotify for notifications
+try:
+    from winotify import Notification, audio
+    HAS_WINOTIFY = True
+except ImportError:
+    HAS_WINOTIFY = False
+
 import pystray
 from pystray import MenuItem as item
 from PIL import Image, ImageDraw, ImageFont
 
+# ============================================================
+# Constants
+# ============================================================
 NO_WINDOW = 0x08000000
 CONNECT_KEY = "{83DA6326-97A6-4088-9453-A1923F573B29} 15"
 BATTERY_KEY = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2"
 APP_NAME = "BT Battery"
 COPYRIGHT = "Copyright (C) 2026 by JARxAI"
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 
+# ============================================================
+# Settings Manager
+# ============================================================
+class SettingsManager:
+    def __init__(self):
+        self.data = self.load()
+    
+    def load(self):
+        try:
+            with open(SETTINGS_FILE, "r") as f:
+                return json.load(f)
+        except:
+            return {
+                "visible_devices": [],
+                "notifications_enabled": True,
+                "notification_thresholds": [30, 20, 10]
+            }
+    
+    def save(self):
+        try:
+            with open(SETTINGS_FILE, "w") as f:
+                json.dump(self.data, f, indent=2)
+        except: pass
+    
+    def get_visible_devices(self):
+        return self.data.get("visible_devices", [])
+    
+    def set_visible_devices(self, devices):
+        self.data["visible_devices"] = devices
+        self.save()
+    
+    def is_notifications_enabled(self):
+        return self.data.get("notifications_enabled", True)
+    
+    def get_thresholds(self):
+        return self.data.get("notification_thresholds", [30, 20, 10])
+
+# ============================================================
+# Notification Manager
+# ============================================================
+class NotificationManager:
+    def __init__(self, settings):
+        self.settings = settings
+        self.notified = {}
+    
+    def check_and_notify(self, device_name, battery_level):
+        if not self.settings.is_notifications_enabled():
+            return
+        if battery_level is None:
+            return
+        
+        for threshold in self.settings.get_thresholds():
+            if battery_level <= threshold:
+                key = f"{device_name}_{threshold}"
+                if key not in self.notified:
+                    self.notify(device_name, battery_level)
+                    self.notified[key] = True
+                    break
+    
+    def notify(self, device_name, battery_level):
+        if not HAS_WINOTIFY:
+            return
+        try:
+            toast = Notification(
+                app_id=APP_NAME,
+                title="Battery Low",
+                msg=f"{device_name} is at {battery_level}%",
+                duration="long"
+            )
+            toast.show()
+        except: pass
+    
+    def reset(self, device_name):
+        keys = [k for k in self.notified if k.startswith(device_name)]
+        for key in keys:
+            del self.notified[key]
+
+# ============================================================
+# PowerShell Functions
+# ============================================================
 def run_ps(cmd, timeout=20):
     try:
         r = subprocess.run(["powershell", "-NoProfile", "-Command", cmd],
@@ -32,8 +130,8 @@ def run_ps(cmd, timeout=20):
     except:
         return ""
 
-def scan():
-    """Get audio devices with battery"""
+def scan_audio():
+    """Scan audio devices only (fast, for display)"""
     ps = """
 Get-PnpDevice -Status OK | Where-Object {
     $_.InstanceId -match 'BTHENUM' -and
@@ -60,7 +158,39 @@ Get-PnpDevice -Status OK | Where-Object {
     @{Name=$name; Battery=$battery} | ConvertTo-Json -Compress
 }
 """
-    out = run_ps(ps)
+    return _parse_scan(run_ps(ps))
+
+def scan_all():
+    """Scan ALL Bluetooth devices (for Settings, slower)"""
+    ps = """
+Get-PnpDevice -Status OK | Where-Object {
+    $_.InstanceId -match 'BTHENUM' -and
+    $_.FriendlyName -notmatch 'Microsoft Bluetooth|RFCOMM|Protocol'
+} | Select-Object -ExpandProperty FriendlyName -Unique | ForEach-Object {
+    $name = $_
+    $base = $name -replace ' Avrcp Transport','' -replace ' Hands-Free','' -replace ' Handsfree','' -replace ' Headset','' -replace ' Headphones','' -replace ' \(','' -replace '\)',''
+    
+    $connected = $false
+    Get-PnpDevice -Status OK -FriendlyName "*$base*" | Where-Object { $_.InstanceId -match 'BTHENUM' } | ForEach-Object {
+        $c = $_ | Get-PnpDeviceProperty -KeyName '""" + CONNECT_KEY + """' -ErrorAction SilentlyContinue
+        if ($c -and [bool]$c.Data) { $connected = $true }
+    }
+    
+    $battery = $null
+    if ($connected) {
+        $b = Get-PnpDevice -Status OK -FriendlyName "*$base*" | ForEach-Object {
+            $t = $_ | Get-PnpDeviceProperty -KeyName '""" + BATTERY_KEY + """' -ErrorAction SilentlyContinue | Where Type -ne Empty
+            if ($t) { $t.Data }
+        } | Select-Object -First 1
+        if ($b) { $battery = [int]$b }
+    }
+    
+    @{Name=$name; Battery=$battery; Connected=$connected} | ConvertTo-Json -Compress
+}
+"""
+    return _parse_scan(run_ps(ps, timeout=30))
+
+def _parse_scan(out):
     devices = []
     if out:
         for line in out.split(chr(10)):
@@ -68,13 +198,14 @@ Get-PnpDevice -Status OK | Where-Object {
             if not line: continue
             try:
                 d = json.loads(line)
-                if d.get("Battery") is not None:
-                    devices.append(d)
+                devices.append(d)
             except: pass
     return devices
 
+# ============================================================
+# Icon Drawing
+# ============================================================
 def make_icon(battery=None):
-    """Create icon"""
     img = Image.new("RGBA", (64, 64), (0,0,0,0))
     d = ImageDraw.Draw(img)
     if battery is None:
@@ -98,37 +229,111 @@ def make_icon(battery=None):
     d.text((22,2), "BT", fill="cyan", font=fs)
     return img
 
-# Global state
-devices = []
-main_device = None
-
-def do_scan():
-    global devices, main_device
-    devices = scan()
-    main_device = devices[0] if devices else None
-
-def on_refresh(icon, item):
-    global devices, main_device
-    do_scan()
-    if main_device:
-        icon.icon = make_icon(main_device.get("Battery"))
-        icon.title = main_device["Name"] + " | " + str(main_device.get("Battery","?")) + "%"
-    else:
-        icon.icon = make_icon(None)
-        icon.title = "No device"
-
-def on_info(icon, item):
+# ============================================================
+# Settings Window
+# ============================================================
+def show_settings(icon_ref, settings, on_done):
     def show():
         root = tk.Tk()
-        root.title("BT Battery Info")
-        root.geometry("400x300")
+        root.title("Settings - " + APP_NAME)
+        root.geometry("450x400")
+        root.attributes("-topmost", True)
+        
+        # Header
+        tk.Label(root, text="Device Selection", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=(10,5))
+        tk.Label(root, text="Scanning Bluetooth devices...", fg="gray").pack(anchor="w", padx=10)
+        
+        # Scrollable list
+        list_frame = tk.Frame(root)
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        
+        canvas = tk.Canvas(list_frame, highlightthickness=0)
+        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=canvas.yview)
+        scrollable = tk.Frame(canvas)
+        scrollable.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=scrollable, anchor="nw", tags="inner")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfig("inner", width=e.width))
+        
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        # Scan in background
+        def do_scan():
+            all_devices = scan_all()
+            root.after(0, lambda: populate_list(all_devices))
+        
+        def populate_list(all_devices):
+            # Remove scanning label
+            for w in root.winfo_children():
+                if isinstance(w, tk.Label) and "Scanning" in w.cget("text"):
+                    w.destroy()
+            
+            tk.Label(root, text=f"Found {len(all_devices)} devices:", anchor="w").pack(anchor="w", padx=10)
+            
+            # Get currently visible devices
+            visible = settings.get_visible_devices()
+            
+            device_vars = {}
+            for dev in all_devices:
+                name = dev["Name"]
+                battery = dev.get("Battery")
+                connected = dev.get("Connected", False)
+                
+                var = tk.BooleanVar(root, value=(name in visible))
+                device_vars[name] = var
+                
+                frame = tk.Frame(scrollable)
+                frame.pack(fill=tk.X, pady=1)
+                
+                tk.Checkbutton(frame, text="", variable=var).pack(side=tk.LEFT)
+                
+                # Status indicator
+                status = "🟢" if connected else "⚪"
+                tk.Label(frame, text=status, width=2).pack(side=tk.LEFT)
+                
+                # Device name
+                name_text = name
+                if battery is not None:
+                    name_text += f" ({battery}%)"
+                tk.Label(frame, text=name_text, anchor="w", width=35).pack(side=tk.LEFT, fill=tk.X)
+            
+            # Save function
+            def save():
+                selected = [n for n, v in device_vars.items() if v.get()]
+                settings.set_visible_devices(selected)
+                on_done()
+                root.destroy()
+            
+            # Buttons
+            btn_frame = tk.Frame(root)
+            btn_frame.pack(fill=tk.X, padx=10, pady=10)
+            tk.Button(btn_frame, text="Save", command=save, padx=20, pady=5).pack(side=tk.RIGHT, padx=5)
+            tk.Button(btn_frame, text="Cancel", command=root.destroy, padx=20, pady=5).pack(side=tk.RIGHT)
+        
+        threading.Thread(target=do_scan, daemon=True).start()
+        root.mainloop()
+    
+    threading.Thread(target=show, daemon=True).start()
+
+# ============================================================
+# Info Window
+# ============================================================
+def show_info(devices):
+    def show():
+        root = tk.Tk()
+        root.title(APP_NAME + " - Info")
+        root.geometry("450x350")
         root.attributes("-topmost", True)
         t = tk.Text(root, wrap=tk.WORD, padx=10, pady=10, font=("Consolas",10))
         t.pack(fill=tk.BOTH, expand=True)
-        lines = ["=== BT Battery Monitor ===", ""]
+        lines = ["=== " + APP_NAME + " ===", ""]
         if devices:
+            lines.append("Connected Devices:")
+            lines.append("")
             for d in devices:
-                lines.append(d["Name"] + ": " + str(d.get("Battery","?")) + "%")
+                b = str(d.get("Battery","?")) + "%" if d.get("Battery") else "N/A"
+                lines.append(f"  {d['Name']}: {b}")
         else:
             lines.append("No devices found")
         lines.append("")
@@ -139,7 +344,10 @@ def on_info(icon, item):
         root.mainloop()
     threading.Thread(target=show, daemon=True).start()
 
-def on_about(icon, item):
+# ============================================================
+# About Window
+# ============================================================
+def show_about():
     def show():
         root = tk.Tk()
         root.title("About")
@@ -155,39 +363,119 @@ def on_about(icon, item):
         root.mainloop()
     threading.Thread(target=show, daemon=True).start()
 
-def on_quit(icon, item):
-    icon.stop()
+# ============================================================
+# Main App
+# ============================================================
+class App:
+    def __init__(self):
+        self.settings = SettingsManager()
+        self.notifier = NotificationManager(self.settings)
+        self.devices = []
+        self.display_device = None
+        self.icon = None
+    
+    def refresh(self):
+        """Refresh display (fast - audio devices only)"""
+        self.devices = scan_audio()
+        
+        # Get visible devices from settings
+        visible = self.settings.get_visible_devices()
+        
+        if visible:
+            # Use saved selection
+            self.display_device = None
+            for dev in self.devices:
+                if dev["Name"] in visible and dev.get("Battery") is not None:
+                    self.display_device = dev
+                    break
+            # Fallback: first device with battery
+            if not self.display_device:
+                for dev in self.devices:
+                    if dev.get("Battery") is not None:
+                        self.display_device = dev
+                        break
+        else:
+            # No settings: auto-select first device with battery
+            for dev in self.devices:
+                if dev.get("Battery") is not None:
+                    self.display_device = dev
+                    self.settings.set_visible_devices([dev["Name"]])
+                    break
+        
+        # Check notifications
+        for dev in self.devices:
+            if dev.get("Battery") is not None:
+                self.notifier.check_and_notify(dev["Name"], dev["Battery"])
+        
+        self.update_icon()
+    
+    def update_icon(self):
+        if not self.icon: return
+        if self.display_device:
+            b = self.display_device.get("Battery")
+            self.icon.icon = make_icon(b)
+            self.icon.title = self.display_device["Name"] + " | " + str(b if b else "?") + "%"
+        else:
+            self.icon.icon = make_icon(None)
+            self.icon.title = "No device"
+    
+    def on_refresh(self, icon, item):
+        self.refresh()
+    
+    def on_settings(self, icon, item):
+        def on_done():
+            self.refresh()
+        show_settings(self.icon, self.settings, on_done)
+    
+    def on_info(self, icon, item):
+        show_info(self.devices)
+    
+    def on_about(self, icon, item):
+        show_about()
+    
+    def on_quit(self, icon, item):
+        icon.stop()
+    
+    def run(self):
+        print("Starting " + APP_NAME + "...")
+        
+        # Initial scan
+        self.refresh()
+        
+        # Create menu
+        menu = pystray.Menu(
+            item("Refresh", self.on_refresh),
+            item("Show Info", self.on_info),
+            pystray.Menu.SEPARATOR,
+            item("Settings...", self.on_settings),
+            item("About", self.on_about),
+            pystray.Menu.SEPARATOR,
+            item("Quit", self.on_quit)
+        )
+        
+        # Create icon
+        if self.display_device:
+            b = self.display_device.get("Battery")
+            title = self.display_device["Name"] + " | " + str(b if b else "?") + "%"
+            icon_img = make_icon(b)
+        else:
+            title = "No device"
+            icon_img = make_icon(None)
+        
+        self.icon = pystray.Icon(APP_NAME, icon_img, title=title, menu=menu)
+        
+        # Background poller
+        def poller():
+            while True:
+                time.sleep(60)
+                self.refresh()
+        threading.Thread(target=poller, daemon=True).start()
+        
+        print("Running!")
+        self.icon.run()
 
-def main():
-    print("Starting " + APP_NAME + "...")
-    do_scan()
-    
-    if main_device:
-        title = main_device["Name"] + " | " + str(main_device.get("Battery","?")) + "%"
-        icon_img = make_icon(main_device.get("Battery"))
-    else:
-        title = "No device"
-        icon_img = make_icon(None)
-    
-    menu = pystray.Menu(
-        item("Refresh", on_refresh),
-        item("Show Info", on_info),
-        pystray.Menu.SEPARATOR,
-        item("About", on_about),
-        pystray.Menu.SEPARATOR,
-        item("Quit", on_quit)
-    )
-    
-    icon = pystray.Icon(APP_NAME, icon_img, title=title, menu=menu)
-    
-    def poller():
-        while True:
-            time.sleep(60)
-            on_refresh(icon, None)
-    threading.Thread(target=poller, daemon=True).start()
-    
-    print("Running!")
-    icon.run()
-
+# ============================================================
+# Entry Point
+# ============================================================
 if __name__ == "__main__":
-    main()
+    App().run()
