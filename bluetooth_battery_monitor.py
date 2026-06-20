@@ -19,12 +19,12 @@ for pkg, pip_name in [("pystray", "pystray"), ("PIL", "Pillow")]:
     except: subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
-# Try to install winotify for notifications
+# Notification library
 try:
-    from winotify import Notification, audio
-    HAS_WINOTIFY = True
+    from plyer import notification as plyer_notification
+    HAS_NOTIFICATION = True
 except ImportError:
-    HAS_WINOTIFY = False
+    HAS_NOTIFICATION = False
 
 import pystray
 from pystray import MenuItem as item
@@ -99,24 +99,61 @@ class NotificationManager:
                     self.notify(device_name, battery_level)
                     self.notified[key] = True
                     break
+                else:
     
     def notify(self, device_name, battery_level):
-        if not HAS_WINOTIFY:
-            return
-        try:
-            toast = Notification(
-                app_id=APP_NAME,
-                title="Battery Low",
-                msg=f"{device_name} is at {battery_level}%",
-                duration="long"
-            )
-            toast.show()
-        except: pass
+        title = "Battery Low"
+        msg = f"{device_name} is at {battery_level}%"
+        
+        # Tkinter taskbar notification (most reliable)
+        self._show_taskbar_notification(title, msg)
+    
+    def _show_taskbar_notification(self, title, msg):
+        """Show notification near taskbar, auto-close after 5s"""
+        def show():
+            root = tk.Tk()
+            root.title(title)
+            # Position near taskbar (bottom-right)
+            x = root.winfo_screenwidth() - 370
+            y = root.winfo_screenheight() - 180
+            root.geometry(f"350x120+{x}+{y}")
+            root.attributes("-topmost", True)
+            root.configure(bg="#2d2d2d")
+            root.overrideredirect(True)  # Remove title bar
+            
+            # Title
+            tk.Label(root, text=title, font=("Arial", 11, "bold"), 
+                     fg="#ff6b6b", bg="#2d2d2d").pack(pady=(15,5))
+            
+            # Message
+            tk.Label(root, text=msg, font=("Arial", 10), 
+                     fg="white", bg="#2d2d2d").pack(pady=5)
+            
+            # Auto close after 5 seconds
+            root.after(5000, root.destroy)
+            root.mainloop()
+        
+        threading.Thread(target=show, daemon=True).start()
+    
+    def _show_popup(self, title, msg):
+        def show():
+            root = tk.Tk()
+            root.title(title)
+            root.geometry("350x120")
+            root.attributes("-topmost", True)
+            root.configure(bg="#2d2d2d")
+            tk.Label(root, text=title, font=("Arial", 11, "bold"), fg="#ff6b6b", bg="#2d2d2d").pack(pady=(15,5))
+            tk.Label(root, text=msg, font=("Arial", 10), fg="white", bg="#2d2d2d").pack(pady=5)
+            tk.Button(root, text="OK", command=root.destroy, padx=15, bg="#404040", fg="white").pack(pady=8)
+            root.mainloop()
+        threading.Thread(target=show, daemon=True).start()
     
     def reset(self, device_name):
         keys = [k for k in self.notified if k.startswith(device_name)]
         for key in keys:
             del self.notified[key]
+
+
 
 # ============================================================
 # PowerShell Functions
@@ -239,11 +276,9 @@ def show_settings(icon_ref, settings, on_done):
         root.geometry("450x400")
         root.attributes("-topmost", True)
         
-        # Header
         tk.Label(root, text="Device Selection", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=(10,5))
         tk.Label(root, text="Scanning Bluetooth devices...", fg="gray").pack(anchor="w", padx=10)
         
-        # Scrollable list
         list_frame = tk.Frame(root)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
         
@@ -258,54 +293,40 @@ def show_settings(icon_ref, settings, on_done):
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Scan in background
         def do_scan():
             all_devices = scan_all()
             root.after(0, lambda: populate_list(all_devices))
         
         def populate_list(all_devices):
-            # Remove scanning label
             for w in root.winfo_children():
                 if isinstance(w, tk.Label) and "Scanning" in w.cget("text"):
                     w.destroy()
             
             tk.Label(root, text=f"Found {len(all_devices)} devices:", anchor="w").pack(anchor="w", padx=10)
-            
-            # Get currently visible devices
             visible = settings.get_visible_devices()
-            
             device_vars = {}
+            
             for dev in all_devices:
                 name = dev["Name"]
                 battery = dev.get("Battery")
                 connected = dev.get("Connected", False)
-                
                 var = tk.BooleanVar(root, value=(name in visible))
                 device_vars[name] = var
                 
                 frame = tk.Frame(scrollable)
                 frame.pack(fill=tk.X, pady=1)
-                
                 tk.Checkbutton(frame, text="", variable=var).pack(side=tk.LEFT)
-                
-                # Status indicator
-                status = "🟢" if connected else "⚪"
+                status = "O" if connected else "x"
                 tk.Label(frame, text=status, width=2).pack(side=tk.LEFT)
-                
-                # Device name
-                name_text = name
-                if battery is not None:
-                    name_text += f" ({battery}%)"
+                name_text = name + (f" ({battery}%)" if battery else "")
                 tk.Label(frame, text=name_text, anchor="w", width=35).pack(side=tk.LEFT, fill=tk.X)
             
-            # Save function
             def save():
                 selected = [n for n, v in device_vars.items() if v.get()]
                 settings.set_visible_devices(selected)
                 on_done()
                 root.destroy()
             
-            # Buttons
             btn_frame = tk.Frame(root)
             btn_frame.pack(fill=tk.X, padx=10, pady=10)
             tk.Button(btn_frame, text="Save", command=save, padx=20, pady=5).pack(side=tk.RIGHT, padx=5)
@@ -313,7 +334,6 @@ def show_settings(icon_ref, settings, on_done):
         
         threading.Thread(target=do_scan, daemon=True).start()
         root.mainloop()
-    
     threading.Thread(target=show, daemon=True).start()
 
 # ============================================================
@@ -363,9 +383,8 @@ def show_about():
         root.mainloop()
     threading.Thread(target=show, daemon=True).start()
 
-# ============================================================
-# Main App
-# ============================================================
+
+
 class App:
     def __init__(self):
         self.settings = SettingsManager()
@@ -376,7 +395,11 @@ class App:
     
     def refresh(self):
         """Refresh display (fast - audio devices only)"""
+        print("[REFRESH] Scanning audio devices...")
         self.devices = scan_audio()
+        print(f"[REFRESH] Found {len(self.devices)} devices")
+        for d in self.devices:
+            print(f"  - {d['Name']}: Battery={d.get('Battery')}")
         
         # Get visible devices from settings
         visible = self.settings.get_visible_devices()

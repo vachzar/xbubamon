@@ -1,0 +1,13 @@
+{
+  "visible_devices": [
+    "Play 2 Avrcp Transport"
+  ],
+  "notifications_enabled": true,
+  "notification_thresholds": [
+    50,
+    40,
+    30,
+    20,
+    10
+  ]
+}
