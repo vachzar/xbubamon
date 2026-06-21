@@ -47,10 +47,9 @@ CONNECT_KEY = "{83DA6326-97A6-4088-9453-A1923F573B29} 15"
 BATTERY_KEY = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2"
 APP_NAME = "BT Battery"
 COPYRIGHT = "Copyright (C) 2026 by JARxAI"
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ICON_PATH = resource_path("icon.ico")
 ICON_PNG_PATH = resource_path("icon.png")
-SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
+SETTINGS_FILE = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'BT Battery', 'settings.json')
 
 # ============================================================
 # Settings Manager
@@ -72,6 +71,7 @@ class SettingsManager:
     
     def save(self):
         try:
+            os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
             with open(SETTINGS_FILE, "w") as f:
                 json.dump(self.data, f, indent=2)
         except: pass

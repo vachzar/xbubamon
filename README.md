@@ -48,7 +48,7 @@ python bluetooth_battery_monitor.py
 pip install pyinstaller
 
 # 2. Build
-pyinstaller --onefile --windowed --name "BT Battery" bluetooth_battery_monitor.py
+pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "BT Battery" bluetooth_battery_monitor.py
 
 # 3. EXE ada di folder dist/
 dist/BT Battery.exe
@@ -56,14 +56,14 @@ dist/BT Battery.exe
 
 ## 📦 Build Options
 
-### Simple Build (Recommended)
+### Simple Build (Recommended — with icon)
 ```bash
-pyinstaller --onefile --windowed --name "BT Battery" bluetooth_battery_monitor.py
+pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "BT Battery" bluetooth_battery_monitor.py
 ```
 
-### Build dengan Icon Custom
+### Build tanpa Icon (no icon files required)
 ```bash
-pyinstaller --onefile --windowed --icon=icon.ico --name "BT Battery" bluetooth_battery_monitor.py
+pyinstaller --onefile --windowed --name "BT Battery" bluetooth_battery_monitor.py
 ```
 
 ### Build tanpa Console Window

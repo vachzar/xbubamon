@@ -26,7 +26,7 @@ echo       Done!
 
 REM Build EXE
 echo [2/3] Building EXE...
-pyinstaller --onefile --windowed --icon=icon.ico --name "BT Battery" bluetooth_battery_monitor.py
+pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "BT Battery" bluetooth_battery_monitor.py
 if errorlevel 1 (
     echo [ERROR] Build failed!
     pause
