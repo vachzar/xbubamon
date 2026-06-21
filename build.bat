@@ -26,7 +26,9 @@ echo       Done!
 
 REM Build EXE
 echo [2/3] Building EXE...
-pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "XBubamon" bluetooth_battery_monitor.py
+for /f %%i in ('powershell -NoProfile -Command "(Get-Date).ToString(\"yyyyMMddHHmm\")"') do set "BUILD_TS=%%i"
+set "APP_NAME=XBubamon-%BUILD_TS%"
+pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --add-data "logo.png;." --name "%APP_NAME%" bluetooth_battery_monitor.py
 if errorlevel 1 (
     echo [ERROR] Build failed!
     pause
@@ -38,7 +40,7 @@ REM Show result
 echo [3/3] Build complete!
 echo.
 echo ========================================
-echo   EXE location: dist\XBubamon.exe
+echo   EXE location: dist\%APP_NAME%.exe
 echo ========================================
 echo.
 pause
