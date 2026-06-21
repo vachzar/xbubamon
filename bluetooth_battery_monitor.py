@@ -257,33 +257,65 @@ def _parse_scan(out):
 # Icon Drawing
 # ============================================================
 def make_icon(battery=None):
-    """Create dynamic battery icon"""
+    """Create squary icon with dragon head"""
     img = Image.new("RGBA", (64, 64), (0,0,0,0))
     d = ImageDraw.Draw(img)
+    
     if battery is None:
-        d.ellipse([8,8,56,56], fill=(80,80,80))
-        d.line([(20,20),(44,44)], fill="red", width=4)
-        d.line([(44,20),(20,44)], fill="red", width=4)
-    else:
-        bx,by,bw,bh = 10,16,38,32
-        d.rectangle([bx,by,bx+bw,by+bh], outline="white", width=2)
-        d.rectangle([bx+bw,by+8,bx+bw+5,by+bh-8], outline="white", fill="white")
-        c = (0,200,0) if battery > 60 else (255,200,0) if battery > 30 else (255,50,50)
-        fw = int((bw-6)*min(battery,100)/100)
-        d.rectangle([bx+3,by+3,bx+3+fw,by+bh-3], fill=c)
-        try: f = ImageFont.truetype("arial.ttf", 14)
-        except: f = ImageFont.load_default()
-        t = str(battery)+"%"
-        bb = d.textbbox((0,0), t, font=f)
-        d.text((bx+(bw-bb[2]+bb[0])//2, by+(bh-bb[3]+bb[1])//2), t, fill="white", font=f)
-    try: fs = ImageFont.truetype("arial.ttf", 10)
-    except: fs = ImageFont.load_default()
-    d.text((22,2), "BT", fill="cyan", font=fs)
+        # Disconnected
+        d.rectangle([8, 8, 56, 56], fill=(60,60,60), outline=(100,100,100))
+        d.line([(18,18),(46,46)], fill="red", width=3)
+        d.line([(46,18),(18,46)], fill="red", width=3)
+        return img
+    
+    # Square battery body
+    bx, by, bw, bh = 4, 4, 56, 56
+    d.rectangle([bx, by, bx+bw, by+bh], fill=(30,30,30), outline=(80,80,80), width=2)
+    
+    # Battery tip (top)
+    d.rectangle([bx+20, by-4, bx+36, by+2], fill=(80,80,80), outline=(100,100,100))
+    
+    # Battery fill (from bottom up)
+    c = (0, 200, 0) if battery > 60 else (255, 200, 0) if battery > 30 else (255, 50, 50)
+    fill_height = int((bh-8) * min(battery, 100) / 100)
+    d.rectangle([bx+4, by+bh-4-fill_height, bx+bw-4, by+bh-4], fill=c)
+    
+    # Dragon head - trapezoid
+    dragon_color = (255, 255, 255) if battery > 50 else (200, 200, 200)
+    dx, dy = bx+14, by+12
+    
+    # Trapezoid body
+    points = [
+        (dx, dy),
+        (dx+26, dy),
+        (dx+22, dy+16),
+        (dx+4, dy+16)
+    ]
+    d.polygon(points, fill=dragon_color, outline=(150,150,150))
+    
+    # Horns - pointing UP
+    d.polygon([(dx+2, dy+2), (dx+8, dy+2), (dx+5, dy-6)], fill=dragon_color)
+    d.polygon([(dx+18, dy+2), (dx+24, dy+2), (dx+21, dy-6)], fill=dragon_color)
+    
+    # Eyes
+    d.rectangle([dx+6, dy+4, dx+10, dy+8], fill=(0,0,0))
+    d.rectangle([dx+16, dy+4, dx+20, dy+8], fill=(0,0,0))
+    
+    # Nose
+    d.rectangle([dx+8, dy+12, dx+18, dy+15], fill=dragon_color)
+    d.rectangle([dx+10, dy+13, dx+12, dy+15], fill=(0,0,0))
+    d.rectangle([dx+16, dy+13, dx+18, dy+15], fill=(0,0,0))
+    
+    # Battery percentage text
+    try: f = ImageFont.truetype("arial.ttf", 14)
+    except: f = ImageFont.load_default()
+    t = str(battery) + "%"
+    bb = d.textbbox((0,0), t, font=f)
+    tw, th = bb[2]-bb[0], bb[3]-bb[1]
+    d.text((bx+(bw-tw)//2, by+bh-18), t, fill="white", font=f)
+    
     return img
 
-# ============================================================
-# Settings Window
-# ============================================================
 def show_settings(icon_ref, settings, on_done):
     def show():
         root = tk.Tk()
@@ -484,11 +516,18 @@ class App:
         if not self.icon: return
         if self.display_device:
             b = self.display_device.get("Battery")
-            self.icon.icon = make_icon(b)
+            new_icon = make_icon(b)
+            self.icon.icon = new_icon
             self.icon.title = self.display_device["Name"] + " | " + str(b if b else "?") + "%"
         else:
-            self.icon.icon = make_icon(None)
+            new_icon = make_icon(None)
+            self.icon.icon = new_icon
             self.icon.title = "No device"
+        # Force update
+        try:
+            self.icon.update_icon()
+        except:
+            pass
     
     def on_refresh(self, icon, item):
         self.refresh()
