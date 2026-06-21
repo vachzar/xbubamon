@@ -26,7 +26,7 @@ echo       Done!
 
 REM Build EXE
 echo [2/3] Building EXE...
-pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "BT Battery" bluetooth_battery_monitor.py
+pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "XBubamon" bluetooth_battery_monitor.py
 if errorlevel 1 (
     echo [ERROR] Build failed!
     pause
@@ -38,7 +38,7 @@ REM Show result
 echo [3/3] Build complete!
 echo.
 echo ========================================
-echo   EXE location: dist\BT Battery.exe
+echo   EXE location: dist\XBubamon.exe
 echo ========================================
 echo.
 pause

@@ -1,8 +1,6 @@
-# 🔋 BT Battery Monitor
+# 🔋 XBubamon
 
 > Bluetooth Speaker Battery Monitor for Windows System Tray
-
-Copyright (C) 2026 by JARxAI
 
 ---
 

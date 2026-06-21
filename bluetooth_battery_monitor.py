@@ -45,7 +45,8 @@ def resource_path(relative_path):
 NO_WINDOW = 0x08000000
 CONNECT_KEY = "{83DA6326-97A6-4088-9453-A1923F573B29} 15"
 BATTERY_KEY = "{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2"
-APP_NAME = "BT Battery"
+VERSION = "0.1.0"
+APP_NAME = "XBubamon" + " v" + VERSION
 COPYRIGHT = "Copyright (C) 2026 by JARxAI"
 ICON_PATH = resource_path("icon.ico")
 ICON_PNG_PATH = resource_path("icon.png")
