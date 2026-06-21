@@ -262,11 +262,49 @@ def make_icon(battery=None):
     d = ImageDraw.Draw(img)
     
     if battery is None:
-        # Disconnected
-        d.rectangle([8, 8, 56, 56], fill=(60,60,60), outline=(100,100,100))
-        d.line([(18,18),(46,46)], fill="red", width=3)
-        d.line([(46,18),(18,46)], fill="red", width=3)
+        # Disconnected - dragon with red X
+        # Square battery body (gray)
+        bx, by, bw, bh = 4, 4, 56, 56
+        d.rectangle([bx, by, bx+bw, by+bh], fill=(40,40,40), outline=(80,80,80), width=2)
+        
+        # Battery tip
+        d.rectangle([bx+20, by-4, bx+36, by+2], fill=(60,60,60), outline=(80,80,80))
+        
+        # Red X (BEHIND dragon)
+        x_color = (255, 50, 50)
+        x_width = 5
+        d.line([(12, 12), (52, 52)], fill=x_color, width=x_width)
+        d.line([(52, 12), (12, 52)], fill=x_color, width=x_width)
+        
+        # Dragon head - centered and lower (dy=22)
+        dragon_color = (255, 255, 255)
+        dx, dy = 19, 22
+        
+        # Trapezoid body
+        points = [
+            (dx, dy),
+            (dx+26, dy),
+            (dx+22, dy+18),
+            (dx+4, dy+18)
+        ]
+        d.polygon(points, fill=dragon_color, outline=(200,200,200))
+        
+        # Horns - pointing UP (white)
+        d.polygon([(dx+2, dy+2), (dx+8, dy+2), (dx+5, dy-6)], fill=dragon_color)
+        d.polygon([(dx+18, dy+2), (dx+24, dy+2), (dx+21, dy-6)], fill=dragon_color)
+        
+        # Eyes (black)
+        d.rectangle([dx+6, dy+5, dx+10, dy+9], fill=(0,0,0))
+        d.rectangle([dx+16, dy+5, dx+20, dy+9], fill=(0,0,0))
+        
+        # Nose
+        d.rectangle([dx+8, dy+13, dx+18, dy+16], fill=dragon_color)
+        d.rectangle([dx+10, dy+14, dx+12, dy+16], fill=(0,0,0))
+        d.rectangle([dx+16, dy+14, dx+18, dy+16], fill=(0,0,0))
+        
         return img
+
+
     
     # Square battery body
     bx, by, bw, bh = 4, 4, 56, 56
