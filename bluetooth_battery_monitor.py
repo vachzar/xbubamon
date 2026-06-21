@@ -103,8 +103,13 @@ class SettingsManager:
     def save(self):
         try:
             os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
-            with open(SETTINGS_FILE, "w") as f:
+            # Atomic write: write to temp file, then rename
+            tmp = SETTINGS_FILE + ".tmp"
+            with open(tmp, "w") as f:
                 json.dump(self.data, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, SETTINGS_FILE)
         except (OSError, IOError) as e:
             L = "Failed to save settings: " + str(e)
             logger.error(L)
