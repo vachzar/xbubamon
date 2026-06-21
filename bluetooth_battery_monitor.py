@@ -318,17 +318,20 @@ def make_icon(battery=None):
 
 def show_settings(icon_ref, settings, on_done):
     def show():
+        # Scan devices FIRST (synchronous, takes ~5-7s)
+        all_devices = scan_all()
+        
+        # Then create window
         root = tk.Tk()
         root.title("Settings - " + APP_NAME)
         if os.path.exists(ICON_PATH):
-            try:
-                root.iconbitmap(ICON_PATH)
+            try: root.iconbitmap(ICON_PATH)
             except: pass
         root.geometry("450x400")
         root.attributes("-topmost", True)
         
         tk.Label(root, text="Device Selection", font=("Arial", 12, "bold")).pack(anchor="w", padx=10, pady=(10,5))
-        tk.Label(root, text="Scanning Bluetooth devices...", fg="gray").pack(anchor="w", padx=10)
+        tk.Label(root, text=f"Found {len(all_devices)} devices:", anchor="w").pack(anchor="w", padx=10)
         
         list_frame = tk.Frame(root)
         list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
@@ -340,64 +343,42 @@ def show_settings(icon_ref, settings, on_done):
         canvas.create_window((0, 0), window=scrollable, anchor="nw", tags="inner")
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.bind("<Configure>", lambda e: canvas.itemconfig("inner", width=e.width))
-        
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        # Store results for thread-safe access
-        result = {"devices": None}
+        visible = settings.get_visible_devices()
+        device_vars = {}
         
-        def do_scan():
-            result["devices"] = scan_all()
-            root.event_generate("<<ScanDone>>", when="tail")
+        for dev in all_devices:
+            name = dev["Name"]
+            battery = dev.get("Battery")
+            connected = dev.get("Connected", False)
+            var = tk.BooleanVar(root, value=(name in visible))
+            device_vars[name] = var
+            
+            frame = tk.Frame(scrollable)
+            frame.pack(fill=tk.X, pady=1)
+            tk.Checkbutton(frame, text="", variable=var).pack(side=tk.LEFT)
+            status = "O" if connected else "x"
+            tk.Label(frame, text=status, width=2).pack(side=tk.LEFT)
+            name_text = name + (f" ({battery}%)" if battery else "")
+            tk.Label(frame, text=name_text, anchor="w", width=35).pack(side=tk.LEFT, fill=tk.X)
         
-        def on_scan_done(event):
-            all_devices = result["devices"]
-            if all_devices is None:
-                return
+        def save():
+            selected = [n for n, v in device_vars.items() if v.get()]
+            settings.set_visible_devices(selected)
+            on_done()
+            root.destroy()
         
-        def populate_list(all_devices):
-            for w in root.winfo_children():
-                if isinstance(w, tk.Label) and "Scanning" in w.cget("text"):
-                    w.destroy()
-            
-            tk.Label(root, text=f"Found {len(all_devices)} devices:", anchor="w").pack(anchor="w", padx=10)
-            visible = settings.get_visible_devices()
-            device_vars = {}
-            
-            for dev in all_devices:
-                name = dev["Name"]
-                battery = dev.get("Battery")
-                connected = dev.get("Connected", False)
-                var = tk.BooleanVar(root, value=(name in visible))
-                device_vars[name] = var
-                
-                frame = tk.Frame(scrollable)
-                frame.pack(fill=tk.X, pady=1)
-                tk.Checkbutton(frame, text="", variable=var).pack(side=tk.LEFT)
-                status = "O" if connected else "x"
-                tk.Label(frame, text=status, width=2).pack(side=tk.LEFT)
-                name_text = name + (f" ({battery}%)" if battery else "")
-                tk.Label(frame, text=name_text, anchor="w", width=35).pack(side=tk.LEFT, fill=tk.X)
-            
-            def save():
-                selected = [n for n, v in device_vars.items() if v.get()]
-                settings.set_visible_devices(selected)
-                on_done()
-                root.destroy()
-            
-            btn_frame = tk.Frame(root)
-            btn_frame.pack(fill=tk.X, padx=10, pady=10)
-            tk.Button(btn_frame, text="Save", command=save, padx=20, pady=5).pack(side=tk.RIGHT, padx=5)
-            tk.Button(btn_frame, text="Cancel", command=root.destroy, padx=20, pady=5).pack(side=tk.RIGHT)
+        btn_frame = tk.Frame(root)
+        btn_frame.pack(fill=tk.X, padx=10, pady=10)
+        tk.Button(btn_frame, text="Save", command=save, padx=20, pady=5).pack(side=tk.RIGHT, padx=5)
+        tk.Button(btn_frame, text="Cancel", command=root.destroy, padx=20, pady=5).pack(side=tk.RIGHT)
         
-        threading.Thread(target=do_scan, daemon=True).start()
         root.mainloop()
+    
     threading.Thread(target=show, daemon=True).start()
 
-# ============================================================
-# Info Window
-# ============================================================
 def show_info(devices):
     def show():
         root = tk.Tk()
