@@ -1,5 +1,5 @@
 # 🔋 XBubamon
-
+![XBubamon Logo](logo.png)
 > Bluetooth Speaker Battery Monitor for Windows System Tray
 
 ---

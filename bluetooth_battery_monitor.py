@@ -49,7 +49,7 @@ VERSION = "0.1.0"
 APP_NAME = "XBubamon" + " v" + VERSION
 COPYRIGHT = "Copyright (C) 2026 by JARxAI"
 ICON_PATH = resource_path("icon.ico")
-ICON_PNG_PATH = resource_path("icon.png")
+ICON_PNG_PATH = resource_path("logo.png")
 SETTINGS_FILE = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'BT Battery', 'settings.json')
 
 # ============================================================
@@ -172,7 +172,7 @@ class NotificationManager:
 # ============================================================
 # PowerShell Functions
 # ============================================================
-def run_ps(cmd, timeout=20):
+def run_ps(cmd, timeout=45):
     try:
         r = subprocess.run(["powershell", "-NoProfile", "-Command", cmd],
                            capture_output=True, text=True, timeout=timeout,
@@ -312,9 +312,17 @@ def show_settings(icon_ref, settings, on_done):
         canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
+        # Store results for thread-safe access
+        result = {"devices": None}
+        
         def do_scan():
-            all_devices = scan_all()
-            root.after(0, lambda: populate_list(all_devices))
+            result["devices"] = scan_all()
+            root.event_generate("<<ScanDone>>", when="tail")
+        
+        def on_scan_done(event):
+            all_devices = result["devices"]
+            if all_devices is None:
+                return
         
         def populate_list(all_devices):
             for w in root.winfo_children():
