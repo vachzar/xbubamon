@@ -12,6 +12,7 @@ import sys, time, threading, subprocess, json, os, logging
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
+import queue
 
 # Logging configuration
 logging.basicConfig(
@@ -31,6 +32,31 @@ except ImportError:
 import pystray
 from pystray import MenuItem as item
 from PIL import Image, ImageDraw, ImageFont
+
+# Tkinter queue for thread-safe window creation
+_tk_queue = queue.Queue()
+_tk_root_ref = [None]
+
+def _tk_processor():
+    """Run Tk mainloop in a dedicated thread, processing queued windows."""
+    def process_queue():
+        while True:
+            try:
+                func = _tk_queue.get_nowait()
+                func()
+            except queue.Empty:
+                break
+        root.after(100, process_queue)
+
+    root = tk.Tk()
+    root.withdraw()
+    _tk_root_ref[0] = root
+    root.after(100, process_queue)
+    root.mainloop()
+
+def _tk_run(func):
+    """Enqueue a window-building function to run on the Tk thread."""
+    _tk_queue.put(func)
 
 # Embed icon for PyInstaller
 def resource_path(relative_path):
@@ -103,6 +129,7 @@ class NotificationManager:
     def __init__(self, settings):
         self.settings = settings
         self.notified = {}
+        self._lock = threading.Lock()
     
     def check_and_notify(self, device_name, battery_level):
         if not self.settings.is_notifications_enabled():
@@ -113,10 +140,11 @@ class NotificationManager:
         for threshold in self.settings.get_thresholds():
             if battery_level <= threshold:
                 key = f"{device_name}_{threshold}"
-                if key not in self.notified:
-                    self.notify(device_name, battery_level)
-                    self.notified[key] = True
-                    break
+                with self._lock:
+                    if key not in self.notified:
+                        self.notify(device_name, battery_level)
+                        self.notified[key] = True
+                break
     def notify(self, device_name, battery_level):
         title = "Battery Low"
         msg = f"{device_name} is at {battery_level}%"
@@ -155,7 +183,7 @@ class NotificationManager:
             root.after(5000, root.destroy)
             root.mainloop()
         
-        threading.Thread(target=show, daemon=True).start()
+        _tk_run(show)
     
     def _show_popup(self, title, msg):
         def show():
@@ -168,13 +196,21 @@ class NotificationManager:
             tk.Label(root, text=msg, font=("Arial", 10), fg="white", bg="#2d2d2d").pack(pady=5)
             tk.Button(root, text="OK", command=root.destroy, padx=15, bg="#404040", fg="white").pack(pady=8)
             root.mainloop()
-        threading.Thread(target=show, daemon=True).start()
+        _tk_run(show)
     
     def reset(self, device_name):
-        keys = [k for k in self.notified if k.startswith(device_name)]
-        for key in keys:
-            del self.notified[key]
+        with self._lock:
+            keys = [k for k in self.notified if k.startswith(device_name)]
+            for key in keys:
+                del self.notified[key]
 
+    def cleanup_notified(self, max_entries=100):
+        """Prevent unbounded growth of notified dict."""
+        with self._lock:
+            if len(self.notified) > max_entries:
+                excess = len(self.notified) - 50
+                for key in list(self.notified.keys())[:excess]:
+                    del self.notified[key]
 
 
 # ============================================================
@@ -430,7 +466,7 @@ def show_settings(icon_ref, settings, on_done):
         
         root.mainloop()
     
-    threading.Thread(target=show, daemon=True).start()
+    _tk_run(show)
 
 def show_info(devices):
     def show():
@@ -461,7 +497,7 @@ def show_info(devices):
         t.config(state=tk.DISABLED)
         tk.Button(root, text="Close", command=root.destroy, padx=20, pady=5).pack(pady=8)
         root.mainloop()
-    threading.Thread(target=show, daemon=True).start()
+    _tk_run(show)
 
 # ============================================================
 # About Window
@@ -500,7 +536,7 @@ def show_about():
         tk.Label(f, text=COPYRIGHT, font=("Arial",9,"italic"), fg="gray").pack(pady=(10,0))
         tk.Button(f, text="Close", command=root.destroy, padx=15, pady=3).pack(pady=(10,0))
         root.mainloop()
-    threading.Thread(target=show, daemon=True).start()
+    _tk_run(show)
 
 
 
@@ -511,61 +547,66 @@ class App:
         self.devices = []
         self.display_device = None
         self.icon = None
+        self._lock = threading.Lock()
     
     def refresh(self):
         """Refresh display (fast - audio devices only)"""
         logger.info("Scanning audio devices...")
-        self.devices = scan_audio()
-        logger.info(f"Found {len(self.devices)} devices")
-        
+        new_devices = scan_audio()
+        logger.info(f"Found {len(new_devices)} devices")
+
         # Get visible devices from settings
         visible = self.settings.get_visible_devices()
-        
+        display_device = None
+
         if visible:
-            # Use saved selection
-            self.display_device = None
-            for dev in self.devices:
+            for dev in new_devices:
                 if dev["Name"] in visible and dev.get("Battery") is not None:
-                    self.display_device = dev
+                    display_device = dev
                     break
-            # Fallback: first device with battery
-            if not self.display_device:
-                for dev in self.devices:
+            if not display_device:
+                for dev in new_devices:
                     if dev.get("Battery") is not None:
-                        self.display_device = dev
+                        display_device = dev
                         break
         else:
-            # No settings: auto-select first device with battery
-            for dev in self.devices:
+            for dev in new_devices:
                 if dev.get("Battery") is not None:
-                    self.display_device = dev
+                    display_device = dev
                     self.settings.set_visible_devices([dev["Name"]])
                     break
-        
-        # Check notifications
-        for dev in self.devices:
+
+        # Lock: update shared state atomically
+        with self._lock:
+            self.devices = new_devices
+            self.display_device = display_device
+
+        # Notifications (uses its own lock)
+        for dev in new_devices:
             if dev.get("Battery") is not None:
                 self.notifier.check_and_notify(dev["Name"], dev["Battery"])
-        
+        self.notifier.cleanup_notified()
+
         self.update_icon()
-    
+
     def update_icon(self):
-        if not self.icon: return
-        if self.display_device:
-            b = self.display_device.get("Battery")
-            new_icon = make_icon(b)
-            self.icon.icon = new_icon
-            self.icon.title = self.display_device["Name"] + " | " + str(b if b else "?") + "%"
-        else:
-            new_icon = make_icon(None)
-            self.icon.icon = new_icon
-            self.icon.title = "No device"
-        # Force update
+        if not self.icon:
+            return
+        with self._lock:
+            if self.display_device:
+                b = self.display_device.get("Battery")
+                new_icon = make_icon(b)
+                title = self.display_device["Name"] + " | " + str(b if b else "?") + "%"
+            else:
+                new_icon = make_icon(None)
+                title = "No device"
+        self.icon.icon = new_icon
+        self.icon.title = title
         try:
             self.icon.update_icon()
-        except:
-            pass
-    
+        except Exception as e:
+            logger.warning(f"Icon update failed: {e}")
+
     def on_refresh(self, icon, item):
         self.refresh()
     
@@ -575,7 +616,9 @@ class App:
         show_settings(self.icon, self.settings, on_done)
     
     def on_info(self, icon, item):
-        show_info(self.devices)
+        with self._lock:
+            devs = list(self.devices)
+        show_info(devs)
     
     def on_about(self, icon, item):
         show_about()
@@ -625,4 +668,7 @@ class App:
 # Entry Point
 # ============================================================
 if __name__ == "__main__":
+    # Start Tk processor in background
+    threading.Thread(target=_tk_processor, daemon=True).start()
+    time.sleep(0.3)  # let Tk root initialize
     App().run()
