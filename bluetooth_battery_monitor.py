@@ -160,47 +160,45 @@ class NotificationManager:
     def _show_taskbar_notification(self, title, msg):
         """Show notification near taskbar, auto-close after 5s"""
         def show():
-            root = tk.Tk()
-            root.title(title)
-            if os.path.exists(ICON_PATH):
-                try:
-                    root.iconbitmap(ICON_PATH)
-                except Exception as e:
-                    L = "Icon not available: " + str(e)
-                    logger.warning(L)
+            if _tk_root_ref[0] is None:
+                return
+            parent = _tk_root_ref[0]
+            win = tk.Toplevel(parent)
+            win.title(title)
             # Position near taskbar (bottom-right)
-            x = root.winfo_screenwidth() - 370
-            y = root.winfo_screenheight() - 180
-            root.geometry(f"350x120+{x}+{y}")
-            root.attributes("-topmost", True)
-            root.configure(bg="#2d2d2d")
-            root.overrideredirect(True)  # Remove title bar
+            x = win.winfo_screenwidth() - 370
+            y = win.winfo_screenheight() - 180
+            win.geometry(f"350x120+{x}+{y}")
+            win.attributes("-topmost", True)
+            win.configure(bg="#2d2d2d")
+            win.overrideredirect(True)  # Remove title bar
             
             # Title
-            tk.Label(root, text=title, font=("Arial", 11, "bold"), 
+            tk.Label(win, text=title, font=("Arial", 11, "bold"),
                      fg="#ff6b6b", bg="#2d2d2d").pack(pady=(15,5))
             
             # Message
-            tk.Label(root, text=msg, font=("Arial", 10), 
+            tk.Label(win, text=msg, font=("Arial", 10),
                      fg="white", bg="#2d2d2d").pack(pady=5)
             
             # Auto close after 5 seconds
-            root.after(5000, root.destroy)
-            root.mainloop()
+            win.after(5000, win.destroy)
         
         _tk_run(show)
     
     def _show_popup(self, title, msg):
         def show():
-            root = tk.Tk()
-            root.title(title)
-            root.geometry("350x120")
-            root.attributes("-topmost", True)
-            root.configure(bg="#2d2d2d")
-            tk.Label(root, text=title, font=("Arial", 11, "bold"), fg="#ff6b6b", bg="#2d2d2d").pack(pady=(15,5))
-            tk.Label(root, text=msg, font=("Arial", 10), fg="white", bg="#2d2d2d").pack(pady=5)
-            tk.Button(root, text="OK", command=root.destroy, padx=15, bg="#404040", fg="white").pack(pady=8)
-            root.mainloop()
+            if _tk_root_ref[0] is None:
+                return
+            parent = _tk_root_ref[0]
+            win = tk.Toplevel(parent)
+            win.title(title)
+            win.geometry("350x120")
+            win.attributes("-topmost", True)
+            win.configure(bg="#2d2d2d")
+            tk.Label(win, text=title, font=("Arial", 11, "bold"), fg="#ff6b6b", bg="#2d2d2d").pack(pady=(15,5))
+            tk.Label(win, text=msg, font=("Arial", 10), fg="white", bg="#2d2d2d").pack(pady=5)
+            tk.Button(win, text="OK", command=win.destroy, padx=15, bg="#404040", fg="white").pack(pady=8)
         _tk_run(show)
     
     def reset(self, device_name):
@@ -414,13 +412,11 @@ def show_settings(icon_ref, settings, on_done):
         all_devices = scan_all()
         
         # Then create window
-        root = tk.Tk()
+        if _tk_root_ref[0] is None:
+            return
+        parent = _tk_root_ref[0]
+        root = tk.Toplevel(parent)
         root.title("Settings - " + APP_NAME)
-        if os.path.exists(ICON_PATH):
-            try: root.iconbitmap(ICON_PATH)
-            except Exception as e:
-                L = "Icon not available: " + str(e)
-                logger.warning(L)
         root.geometry("450x400")
         root.attributes("-topmost", True)
         
@@ -469,21 +465,18 @@ def show_settings(icon_ref, settings, on_done):
         tk.Button(btn_frame, text="Save", command=save, padx=20, pady=5).pack(side=tk.RIGHT, padx=5)
         tk.Button(btn_frame, text="Cancel", command=root.destroy, padx=20, pady=5).pack(side=tk.RIGHT)
         
-        root.mainloop()
+        root.grab_set()
+        parent.wait_window(root)
     
     _tk_run(show)
 
 def show_info(devices):
     def show():
-        root = tk.Tk()
+        if _tk_root_ref[0] is None:
+            return
+        parent = _tk_root_ref[0]
+        root = tk.Toplevel(parent)
         root.title(APP_NAME + " - Info")
-        if os.path.exists(ICON_PATH):
-            try:
-                root.iconbitmap(ICON_PATH)
-            except Exception as e:
-                L = "Icon not available: " + str(e)
-                logger.warning(L)
-        root.geometry("450x350")
         root.attributes("-topmost", True)
         t = tk.Text(root, wrap=tk.WORD, padx=10, pady=10, font=("Consolas",10))
         t.pack(fill=tk.BOTH, expand=True)
@@ -501,7 +494,8 @@ def show_info(devices):
         t.insert(tk.END, chr(10).join(lines))
         t.config(state=tk.DISABLED)
         tk.Button(root, text="Close", command=root.destroy, padx=20, pady=5).pack(pady=8)
-        root.mainloop()
+        root.grab_set()
+        parent.wait_window(root)
     _tk_run(show)
 
 # ============================================================
@@ -509,17 +503,14 @@ def show_info(devices):
 # ============================================================
 def show_about():
     def show():
-        root = tk.Tk()
+        if _tk_root_ref[0] is None:
+            return
+        parent = _tk_root_ref[0]
+        root = tk.Toplevel(parent)
         root.title("About")
         root.geometry("300x250")
         root.resizable(False, False)
         root.attributes("-topmost", True)
-        if os.path.exists(ICON_PATH):
-            try:
-                root.iconbitmap(ICON_PATH)
-            except Exception as e:
-                L = "Icon not available: " + str(e)
-                logger.warning(L)
         f = tk.Frame(root, padx=20, pady=15)
         f.pack(fill=tk.BOTH, expand=True)
         
@@ -540,7 +531,8 @@ def show_about():
         tk.Label(f, text="Bluetooth Battery Monitor").pack(pady=(5,0))
         tk.Label(f, text=COPYRIGHT, font=("Arial",9,"italic"), fg="gray").pack(pady=(10,0))
         tk.Button(f, text="Close", command=root.destroy, padx=15, pady=3).pack(pady=(10,0))
-        root.mainloop()
+        root.grab_set()
+        parent.wait_window(root)
     _tk_run(show)
 
 
@@ -607,10 +599,6 @@ class App:
                 title = "No device"
         self.icon.icon = new_icon
         self.icon.title = title
-        try:
-            self.icon.update_icon()
-        except Exception as e:
-            logger.warning(f"Icon update failed: {e}")
 
     def on_refresh(self, icon, item):
         self.refresh()
