@@ -8,16 +8,18 @@ Features:
 - Battery notifications (30%, 20%, 10%)
 """
 
-import sys, time, threading, subprocess, json, os
+import sys, time, threading, subprocess, json, os, logging
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
 
-# Auto-install
-for pkg, pip_name in [("pystray", "pystray"), ("PIL", "Pillow")]:
-    try: __import__(pkg)
-    except: subprocess.check_call([sys.executable, "-m", "pip", "install", pip_name],
-                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+# Logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%H:%M:%S"
+)
+logger = logging.getLogger("XBubamon")
 
 # Notification library
 try:
@@ -35,7 +37,7 @@ def resource_path(relative_path):
     """Get absolute path to resource"""
     try:
         base_path = sys._MEIPASS
-    except:
+    except Exception:
         base_path = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(base_path, relative_path)
 
@@ -63,7 +65,9 @@ class SettingsManager:
         try:
             with open(SETTINGS_FILE, "r") as f:
                 return json.load(f)
-        except:
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            L = "Settings load failed: " + str(e)
+            logger.warning(L)
             return {
                 "visible_devices": [],
                 "notifications_enabled": True,
@@ -75,7 +79,9 @@ class SettingsManager:
             os.makedirs(os.path.dirname(SETTINGS_FILE), exist_ok=True)
             with open(SETTINGS_FILE, "w") as f:
                 json.dump(self.data, f, indent=2)
-        except: pass
+        except (OSError, IOError) as e:
+            L = "Failed to save settings: " + str(e)
+            logger.error(L)
     
     def get_visible_devices(self):
         return self.data.get("visible_devices", [])
@@ -126,7 +132,9 @@ class NotificationManager:
             if os.path.exists(ICON_PATH):
                 try:
                     root.iconbitmap(ICON_PATH)
-                except: pass
+                except Exception as e:
+                    L = "Icon not available: " + str(e)
+                    logger.warning(L)
             # Position near taskbar (bottom-right)
             x = root.winfo_screenwidth() - 370
             y = root.winfo_screenheight() - 180
@@ -178,7 +186,9 @@ def run_ps(cmd, timeout=45):
                            capture_output=True, text=True, timeout=timeout,
                            creationflags=NO_WINDOW)
         return r.stdout.strip()
-    except:
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError) as e:
+        L = "PowerShell command failed: " + str(e)
+        logger.warning(L)
         return ""
 
 def scan_audio():
@@ -250,7 +260,9 @@ def _parse_scan(out):
             try:
                 d = json.loads(line)
                 devices.append(d)
-            except: pass
+            except (json.JSONDecodeError, KeyError) as e:
+                L = "Parse error: " + str(e)
+                logger.warning(L)
     return devices
 
 # ============================================================
@@ -346,7 +358,8 @@ def make_icon(battery=None):
     
     # Battery percentage text
     try: f = ImageFont.truetype("arial.ttf", 14)
-    except: f = ImageFont.load_default()
+    except Exception:
+        f = ImageFont.load_default()
     t = str(battery) + "%"
     bb = d.textbbox((0,0), t, font=f)
     tw, th = bb[2]-bb[0], bb[3]-bb[1]
@@ -364,7 +377,9 @@ def show_settings(icon_ref, settings, on_done):
         root.title("Settings - " + APP_NAME)
         if os.path.exists(ICON_PATH):
             try: root.iconbitmap(ICON_PATH)
-            except: pass
+            except Exception as e:
+                L = "Icon not available: " + str(e)
+                logger.warning(L)
         root.geometry("450x400")
         root.attributes("-topmost", True)
         
@@ -424,7 +439,9 @@ def show_info(devices):
         if os.path.exists(ICON_PATH):
             try:
                 root.iconbitmap(ICON_PATH)
-            except: pass
+            except Exception as e:
+                L = "Icon not available: " + str(e)
+                logger.warning(L)
         root.geometry("450x350")
         root.attributes("-topmost", True)
         t = tk.Text(root, wrap=tk.WORD, padx=10, pady=10, font=("Consolas",10))
@@ -459,7 +476,9 @@ def show_about():
         if os.path.exists(ICON_PATH):
             try:
                 root.iconbitmap(ICON_PATH)
-            except: pass
+            except Exception as e:
+                L = "Icon not available: " + str(e)
+                logger.warning(L)
         f = tk.Frame(root, padx=20, pady=15)
         f.pack(fill=tk.BOTH, expand=True)
         
@@ -473,7 +492,8 @@ def show_about():
                 tk.Label(f, image=photo).pack(pady=(0,10))
                 f._img = photo  # Keep reference
             except Exception as e:
-                print(f"Icon error: {e}")
+                L = "Icon error: " + str(e)
+                logger.warning(L)
         
         tk.Label(f, text=APP_NAME, font=("Arial",14,"bold")).pack()
         tk.Label(f, text="Bluetooth Battery Monitor").pack(pady=(5,0))
@@ -494,11 +514,9 @@ class App:
     
     def refresh(self):
         """Refresh display (fast - audio devices only)"""
-        print("[REFRESH] Scanning audio devices...")
+        logger.info("Scanning audio devices...")
         self.devices = scan_audio()
-        print(f"[REFRESH] Found {len(self.devices)} devices")
-        for d in self.devices:
-            print(f"  - {d['Name']}: Battery={d.get('Battery')}")
+        logger.info(f"Found {len(self.devices)} devices")
         
         # Get visible devices from settings
         visible = self.settings.get_visible_devices()
@@ -566,7 +584,7 @@ class App:
         icon.stop()
     
     def run(self):
-        print("Starting " + APP_NAME + "...")
+        logger.info("Starting " + APP_NAME + "...")
         
         # Initial scan
         self.refresh()
@@ -600,7 +618,7 @@ class App:
                 self.refresh()
         threading.Thread(target=poller, daemon=True).start()
         
-        print("Running!")
+        logger.info("Running!")
         self.icon.run()
 
 # ============================================================
