@@ -1,148 +1,168 @@
 # 🔋 XBubamon
 ![XBubamon Logo](logo.png)
+
 > Bluetooth Speaker Battery Monitor for Windows System Tray
+
 
 ---
 
-## 📋 Features
+## Features
 
-- ✅ **Real-time battery monitoring** untuk Bluetooth speaker/headphone
-- ✅ **System tray icon** dengan level baterai (warna: hijau/kuning/merah)
-- ✅ **Auto-detect** device Bluetooth yang terkoneksi
-- ✅ **Smart connection check** - hanya tampilkan device yang benar-benar aktif
-- ✅ **Auto-refresh** setiap 60 detik
-- ✅ **Lightweight** - tanpa GUI berat, hanya icon di tray
+- Real-time battery monitoring for Bluetooth speakers/headphones
+- Dynamic system tray icon with dragon design
+- Multi-device display with user selection
+- Battery notifications at configurable thresholds
+- Auto-refresh every 60 seconds
+- Lightweight - no heavy GUI, just system tray icon
 
-## 🎯 Supported Devices
+## Supported Devices
 
 - Bluetooth Speaker
 - Bluetooth Headphone / Headset
 - Bluetooth Earbuds / Buds
-- Device dengan profile A2DP / AVRCP / Handsfree
+- Any device with A2DP / AVRCP / Handsfree profile
 
-## ⚙️ Requirements
+## Requirements
 
 - Windows 10/11
-- Python 3.8+ (untuk menjalankan dari source)
+- Python 3.8+ (for running from source)
 - Bluetooth adapter
-- Speaker/headphone Bluetooth yang sudah pair
+- Paired Bluetooth speaker/headphone
 
-## 🚀 Quick Start
+## Quick Start
 
-### Jalankan dari Source
+### Run from Source
 
 ```bash
-# 1. Install dependencies
+# Install dependencies
 pip install pystray pillow
 
-# 2. Jalankan
+# Run
 python bluetooth_battery_monitor.py
 ```
 
-### Build ke EXE
+### Build to EXE
 
 ```bash
-# 1. Install PyInstaller
+# Install PyInstaller
 pip install pyinstaller
 
-# 2. Build
-pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "BT Battery" bluetooth_battery_monitor.py
+# Build
+pyinstaller --onefile --windowed --icon=icon.ico --name "BT Battery" bluetooth_battery_monitor.py
 
-# 3. EXE ada di folder dist/
+# EXE is in dist/ folder
 dist/BT Battery.exe
 ```
 
-## 📦 Build Options
+### Using build.bat
 
-### Simple Build (Recommended — with icon)
 ```bash
-pyinstaller --onefile --windowed --icon=icon.ico --add-data "icon.ico;." --add-data "icon.png;." --name "BT Battery" bluetooth_battery_monitor.py
+# Double-click build.bat
+# EXE will be created in dist/ folder
 ```
 
-### Build tanpa Icon (no icon files required)
-```bash
-pyinstaller --onefile --windowed --name "BT Battery" bluetooth_battery_monitor.py
-```
-
-### Build tanpa Console Window
-```bash
-pyinstaller --onefile --noconsole --name "BT Battery" bluetooth_battery_monitor.py
-```
-
-### Build dengan Version Info
-```bash
-pyinstaller --onefile --windowed --name "BT Battery" --version-file=version.txt bluetooth_battery_monitor.py
-```
-
-## 📁 File Structure
-
-```
-bluetooth_battery_monitor/
-├── bluetooth_battery_monitor.py   # Main script
-├── README.md                       # This file
-└── dist/
-    └── BT Battery.exe             # Built executable
-```
-
-## 🔧 How It Works
+## How It Works
 
 ### Connection Detection
-Menggunakan property Windows:
-```
-{83DA6326-97A6-4088-9453-A1923F573B29} 15
-```
-Property ini return `True` jika device benar-benar connected, `False` jika disconnected.
+
+Uses Windows property `{83DA6326-97A6-4088-9453-A1923F573B29} 15` to check if device is actually connected. Returns `True` when connected, `False` when disconnected.
 
 ### Battery Reading
-Menggunakan property Windows:
-```
-{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2
-```
-Property ini return level baterai (0-100) dari device Bluetooth.
+
+Uses Windows property `{104EA319-6EE2-4701-BD47-8DDBF425BBE5} 2` to read battery level (0-100%).
 
 ### Detection Flow
+
 ```
-1. Scan semua device Bluetooth dengan audio profile
-2. Cek connection status via property {83DA6326...}
-3. Jika connected → baca battery level
-4. Tampilkan di system tray
+1. Scan all Bluetooth devices with audio profile
+2. Check connection status via property {83DA6326...}
+3. If connected → read battery level
+4. Display in system tray
 ```
 
-## 🖥️ System Tray Icon
+## System Tray Icon
 
-| Icon | Arti |
-|------|------|
-| 🔋 Hijau (>60%) | Baterai penuh |
-| 🟡 Kuning (30-60%) | Baterai sedang |
-| 🔴 Merah (<30%) | Baterai rendah |
-| ❓ abu-abu | Tidak ada device / battery tidak diketahui |
+### Connected States
 
-### Menu
-- **Refresh** - Scan ulang device
-- **Show Info** - Tampilkan detail device & battery
-- **About** - Info aplikasi
-- **Quit** - Keluar
+| Icon | Description |
+|------|-------------|
+| Green battery (>60%) | Battery full |
+| Yellow battery (30-60%) | Battery medium |
+| Red battery (<30%) | Battery low |
 
-## ❓ Troubleshooting
+### Disconnected State
 
-### "No audio device" / Icon tidak muncul
-1. Pastikan speaker/headphone sudah **pair** dan **connected**
-2. Cek di **Settings > Bluetooth & devices** - device harus aktif
-3. Jalankan sebagai **Administrator** jika perlu
+| Icon | Description |
+|------|-------------|
+| Gray with red X | Device disconnected |
 
-### Battery tidak terbaca (tampil "?")
-1. Device mungkin tidak support battery reporting
-2. Coba disconnect & reconnect device
+## Menu Options
+
+- **Refresh** - Rescan devices
+- **Show Info** - Display device details and battery
+- **Settings** - Select which devices to display
+- **About** - Application info
+- **Quit** - Exit application
+
+## Settings
+
+### Device Selection
+
+Open Settings to see all connected Bluetooth devices. Check/uncheck devices to show in tray.
+
+### Notifications
+
+Battery notifications appear when level reaches:
+- 50% (default)
+- 40%
+- 30%
+- 20%
+- 10%
+
+Notifications only appear once per threshold until battery drops further.
+
+## Configuration
+
+Settings are saved in `settings.json`:
+
+```json
+{
+  "visible_devices": ["Play 2 Avrcp Transport"],
+  "notifications_enabled": true,
+  "notification_thresholds": [50, 40, 30, 20, 10]
+}
+```
+
+## Troubleshooting
+
+### "No audio device" / Icon not showing
+
+1. Make sure speaker/headphone is **paired** and **connected**
+2. Check **Settings > Bluetooth & devices** - device must be active
+3. Run as **Administrator** if needed
+
+### Battery not showing (shows "?")
+
+1. Device may not support battery reporting
+2. Try disconnecting & reconnecting device
 3. Restart Bluetooth service:
    ```powershell
    Restart-Service bthserv
    ```
 
-### Aplikasi lambat saat start
-- Normal butuh ~5-7 detik untuk scan devices
-- Ini karena PowerShell butuh waktu query Windows API
+### App slow on startup
 
-## 🛠️ Tech Stack
+- Normal to take ~5-7 seconds for initial scan
+- This is due to PowerShell querying Windows API
+- Subsequent refreshes are faster
+
+### Notifications not appearing
+
+1. Check Windows notification settings
+2. Make sure notifications are enabled in app settings
+3. Restart app after changing settings
+
+## Tech Stack
 
 - **Python 3.10+**
 - **pystray** - System tray icon
@@ -150,40 +170,71 @@ Property ini return level baterai (0-100) dari device Bluetooth.
 - **PowerShell** - Windows API queries
 - **WMI/PnP** - Device detection
 
-## 📝 Version History
+## Project Structure
 
-### v1.0 (2026)
+```
+bluetooth_battery_monitor/
+├── bluetooth_battery_monitor.py   # Main script
+├── icon.png                       # App icon (PNG)
+├── icon.ico                       # App icon (ICO)
+├── logo.png                       # Logo
+├── settings.json                  # User settings
+├── README.md                      # This file
+├── build.bat                      # Build script
+├── .gitignore                     # Git ignore rules
+└── docs/
+    ├── plan.md                    # Feature plan
+    ├── analysis.md                # Request analysis
+    └── story.md                   # Development story
+```
+
+## Version History
+
+### v0.1.0 (2026)
+
 - Initial release
 - Real-time battery monitoring
 - Smart connection detection
 - System tray integration
+- Multi-device support
+- Battery notifications
+- Custom dragon icon
 
-## 👤 Author
+## Author
 
 **JARxAI**
+
 - Copyright (C) 2026
 
-## 📄 License
+## License
 
 MIT License
 
 ---
 
-## 💡 Tips
+Made with Python and Bluetooth magic.
+
+## Tips
 
 ### Run on Startup
-1. Build ke EXE dulu
-2. Copy EXE ke startup folder:
+
+1. Build to EXE first
+2. Copy EXE to startup folder:
    ```
    %APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
    ```
 
 ### Create Shortcut
-1. Klik kanan EXE → Create shortcut
-2. Copy shortcut ke Desktop atau Start Menu
+
+1. Right-click EXE → Create shortcut
+2. Copy shortcut to Desktop or Start Menu
 
 ### Auto-start with Windows
+
 ```powershell
-# Tambahkan ke registry (run as admin)
+# Add to registry (run as admin)
 reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "BT Battery" /d "C:\Path\To\BT Battery.exe" /f
 ```
+
+---
+
