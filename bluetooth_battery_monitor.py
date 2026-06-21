@@ -543,7 +543,7 @@ def show_about():
         if os.path.exists(png_path):
             try:
                 from PIL import Image, ImageTk
-                img = Image.open(png_path).resize((64, 64), Image.Resampling.LANCZOS)
+                img = Image.open(png_path).resize((128, 128), Image.Resampling.LANCZOS)
                 photo = ImageTk.PhotoImage(img)
                 tk.Label(f, image=photo).pack(pady=(0,10))
                 f._img = photo  # Keep reference
