@@ -68,6 +68,10 @@ Thumbs.db
 bt_monitor_cache.json
 bt_monitor_settings.json
 *.log
+*.tmp
+settings.json.tmp
+*.tmp
+settings.json.tmp
 
 # Built EXE
 *.exe

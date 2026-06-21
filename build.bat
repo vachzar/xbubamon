@@ -16,7 +16,7 @@ if errorlevel 1 (
 
 REM Install dependencies
 echo [1/3] Installing dependencies...
-pip install pystray pillow --quiet
+pip install -r requirements.txt --quiet
 if errorlevel 1 (
     echo [ERROR] Failed to install dependencies!
     pause
