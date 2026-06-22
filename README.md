@@ -31,6 +31,12 @@
 
 ## Quick Start
 
+### Run from Releases
+
+- Download from [Releases](https://github.com/vachzar/xbubamon/releases)
+- Double-click XBubamon.exe
+- XBubamon will shown in system tray bottom right of desktop. (sometimes in hiddens icons, drag-n-drop to show it)
+
 ### Run from Source
 
 ```bash
