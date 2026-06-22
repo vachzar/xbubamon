@@ -54,10 +54,10 @@ python bluetooth_battery_monitor.py
 pip install pyinstaller
 
 # Build
-pyinstaller --onefile --windowed --icon=icon.ico --name "BT Battery" bluetooth_battery_monitor.py
+pyinstaller --onefile --windowed --icon=icon.ico --name "XBubamon" bluetooth_battery_monitor.py
 
 # EXE is in dist/ folder
-dist/BT Battery.exe
+dist/XBubamon.exe
 ```
 
 ### Using build.bat
@@ -187,11 +187,7 @@ bluetooth_battery_monitor/
 ├── settings.json                  # User settings
 ├── README.md                      # This file
 ├── build.bat                      # Build script
-├── .gitignore                     # Git ignore rules
-└── docs/
-    ├── plan.md                    # Feature plan
-    ├── analysis.md                # Request analysis
-    └── story.md                   # Development story
+└── .gitignore                     # Git ignore rules
 ```
 
 ## Version History
@@ -239,7 +235,7 @@ Made with Python and Bluetooth magic.
 
 ```powershell
 # Add to registry (run as admin)
-reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "BT Battery" /d "C:\Path\To\BT Battery.exe" /f
+reg add "HKCU\Software\Microsoft\Windows\CurrentVersion\Run" /v "XBubamon" /d "C:\Path\To\XBubamon.exe" /f
 ```
 
 ---
